@@ -78,7 +78,7 @@ if __name__ == "__main__":
     MARGIN_TOP = 150
 
     # Setting up the screen and background
-    GRAY = (110, 110, 110)
+    GRAY = (4, 110, 38)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -88,27 +88,27 @@ if __name__ == "__main__":
 
     deal_button = large_font.render("DEAL", True, (0,0,0), (255,255,255))
     deal_button_rect = deal_button.get_rect()
-    deal_button_rect.center = (970, 800)
+    deal_button_rect.center = (WIDTH/2, HEIGHT/2)
 
     cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, (0,0,0), (255,255,255))
     cpu_score_rect = cpu_score.get_rect()
-    cpu_score_rect.center = (400, 120)
+    cpu_score_rect.center = (WIDTH/4, HEIGHT/10)
 
     player_score = large_font.render("Player Score: " + str(player_score_value), True, (0,0,0), (255,255,255))
     player_score_rect = player_score.get_rect()
-    player_score_rect.center = (1400, 120)
+    player_score_rect.center = (WIDTH - WIDTH/4, HEIGHT/10)
 
     card_matchup = large_font.render("", True, (0,0,0), (255,255,255))
     card_matchup_rect = card_matchup.get_rect()
-    card_matchup_rect.center = (1000, 120)
+    card_matchup_rect.center = (WIDTH/2 - 100, HEIGHT/10)
 
     cpu_count = large_font.render("Cards left: " + str(cpu_size), True, (0,0,0), (255,255,255))
     cpu_count_rect = cpu_count.get_rect()
-    cpu_count_rect.center = (500, 920)
+    cpu_count_rect.center = (WIDTH/4, HEIGHT - HEIGHT/10)
 
     player_count = large_font.render("Cards left: " + str(player_size), True, (0,0,0), (255,255,255))
     player_count_rect = player_count.get_rect()
-    player_count_rect.center = (1400, 920)
+    player_count_rect.center = (WIDTH - WIDTH/4, HEIGHT - HEIGHT/10)
 
 
     card_one = pygame.image.load(r'./cards/back.png')
@@ -127,31 +127,35 @@ if __name__ == "__main__":
                     screen.fill(GRAY)
                     player_score = large_font.render("Player Score: " + str(player_score_value), True, (0,0,0), (255,255,255))
                     cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, (0,0,0), (255,255,255))
-                    if 970 <= mouse[0] <= 970+125 and 800 <= mouse[1] <= 800+60:
-                        card_one = pygame.image.load(r'./cards/' + str(cpu_cards[0].value) + '_of_' + str(cpu_cards[0].suit) + '.png')
-                        card_two = pygame.image.load(r'./cards/' + str(player_cards[0].value) + '_of_' + str(player_cards[0].suit) + '.png')
-                        if war_check == 0:
-                            result = compare_cards(str(cpu_cards[0].value), str(player_cards[0].value))
-                            if result is 1:
-                                print(1)
-                                card_matchup = large_font.render("Cpu won", True, (0,0,0), (255,255,255))
-                                cpu_cards.append(cpu_cards.pop(0))
-                                cpu_cards.append(player_cards.pop(0))
 
+                    if deal_button_rect.collidepoint(pygame.mouse.get_pos()):
+                        #Place the cards down
+
+                        war_list.extend([cpu_cards.pop(0), player_cards.pop(0)])
+                        card_one = pygame.image.load(r'./cards/' + str(war_list[len(war_list)-2].value) + '_of_' + str(war_list[len(war_list)-2].suit) + '.png')
+                        card_two = pygame.image.load(r'./cards/' + str(war_list[len(war_list)-1].value) + '_of_' + str(war_list[len(war_list)-1].suit) + '.png')
+
+                        if war_check == 0:
+                            result = compare_cards(str(war_list[0].value), str(war_list[1].value))
+                            if result is 1:
+                                card_matchup = large_font.render("Cpu won", True, (0,0,0), (255,255,255))
+                                cpu_cards.extend(war_list)
+                                war_list.clear()
                             elif result is 2:
-                                print(2)
                                 card_matchup = large_font.render("Player won", True, (0,0,0), (255,255,255))
-                                player_cards.append(player_cards.pop(0))
-                                player_cards.append(cpu_cards.pop(0))
+                                player_cards.extend(war_list)
+                                war_list.clear()
                             else:
-                                print(3)
                                 card_matchup = large_font.render("War", True, (0,0,0), (255,255,255))
-                                war_check = get_value_of_card(player_cards[0].value)
-                                
-                        if war_check > 0:
+                                war_check = get_value_of_card(war_list[0].value) + 2
+
+                        #If the war is ongoing, continue here
+                        if war_check > 1:
                             card_matchup = large_font.render("War ongoing", True, (0,0,0), (255,255,255)) 
-                            if len(player_cards) == 1 or len(cpu_cards) == 1:
-                                result = compare_cards(str(cpu_cards[0].value), str(player_cards[0].value))
+
+                            #If someone has placed his final card before ending the war, end the war early
+                            if len(player_cards) == 0 or len(cpu_cards) == 0:
+                                result = compare_cards(str(war_list[-2].value), str(war_list[-1].value))
                                 if result == 1:
                                     card_matchup = large_font.render("Cpu won war", True, (0,0,0), (255,255,255))
                                     cpu_cards.extend(war_list)
@@ -160,31 +164,38 @@ if __name__ == "__main__":
                                     player_cards.extend(war_list)
                                 war_list.clear()
                                 war_check = 0
+                            #Otherwise just continue adding cards to the war_list with each click
                             else:
-                                war_list.extend([cpu_cards.pop(0), player_cards.pop(0)])
                                 war_check -= 1
+
+                        #Compare the final cards at the end of the war and append the cards to the winner
                         if war_check == 1:
-                            result = compare_cards(str(cpu_cards[0].value), str(player_cards[0].value))
+                            result = compare_cards(str(war_list[-2].value), str(war_list[-1].value))
                             if result == 1:
                                 card_matchup = large_font.render("Cpu won war", True, (0,0,0), (255,255,255))
                                 cpu_cards.extend(war_list)
+                                war_list.clear()
+                                war_check -= 1
                             elif result == 2:
                                 card_matchup = large_font.render("Player won war", True, (0,0,0), (255,255,255))
                                 player_cards.extend(war_list)
-                            war_list.clear()
-                            war_check -= 1
+                                war_list.clear()
+                                war_check -= 1
+                            #Special case, if the last cards placed at the end of the war have the same value, continue war from there
+                            else: 
+                                card_matchup = large_font.render("War", True, (0,0,0), (255,255,255))
+                                war_check = get_value_of_card(player_cards[0].value)
+
 
                     cpu_count = large_font.render("Cards left: " + str(len(cpu_cards)), True, (0,0,0), (255,255,255))
                     player_count = large_font.render("Cards left: " + str(len(player_cards)), True, (0,0,0), (255,255,255))
 
-                    if len(player_cards)==0:
-                        cpu_score_value +=1
-                        player_cards.clear()
-                        cpu_cards.clear()
-                        shuffle_deck(deck, clock)
-                        split_deck(deck, player_cards, cpu_cards)
-                    if len(cpu_cards)==0:
-                        player_score_value +=1
+                    #If someone is left with no cards, increase the other party's score, reshuffle and split deck
+                    if len(player_cards) == 0 or len(cpu_cards) == 0:
+                        if len(player_cards) == 0:
+                            cpu_score_value += 1
+                        else: 
+                            player_score_value += 1
                         player_cards.clear()
                         cpu_cards.clear()
                         shuffle_deck(deck, clock)
