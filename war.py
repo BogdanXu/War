@@ -3,7 +3,7 @@ import pygame
 from enum import Enum
 suits = ['hearts', 'diamonds', 'spades', 'clubs']
 face_names = ['jack', 'queen', 'king', 'ace']
-
+import time
 
 class Card:
     def __init__(self, value, suit):
@@ -50,6 +50,84 @@ def split_deck(deck, player_cards, cpu_cards):
         player_cards.append(deck[i])
         cpu_cards.append(deck[i + 1])
 
+def game_logic(get_value_of_card, compare_cards, player_cards, cpu_cards, war_list, war_check, large_font):
+
+    #Place the cards down
+    war_list.extend([cpu_cards.pop(0), player_cards.pop(0)])
+    card_one = pygame.image.load(r'./cards/' + str(war_list[len(war_list)-2].value) + '_of_' + str(war_list[len(war_list)-2].suit) + '.png')
+    card_two = pygame.image.load(r'./cards/' + str(war_list[len(war_list)-1].value) + '_of_' + str(war_list[len(war_list)-1].suit) + '.png')
+
+    if war_check == 0:
+        result = compare_cards(str(war_list[0].value), str(war_list[1].value))
+        if result is 1:
+            card_matchup = large_font.render("Cpu won", True, "Black", "White")
+            cpu_cards.extend(war_list)
+            war_list.clear()
+        elif result is 2:
+            card_matchup = large_font.render("Player won", True, "Black", "White")
+            player_cards.extend(war_list)
+            war_list.clear()
+        else:
+            card_matchup = large_font.render("War", True, "Black", "White")
+            war_check = get_value_of_card(war_list[0].value) + 2
+
+    #If the war is ongoing, continue here
+    if war_check > 1:
+        card_matchup = large_font.render("War ongoing", True, "Black", "White") 
+
+        #If someone has placed his final card before ending the war, end the war early
+        if len(player_cards) == 0 or len(cpu_cards) == 0:
+            result = compare_cards(str(war_list[-2].value), str(war_list[-1].value))
+            if result == 1:
+                card_matchup = large_font.render("Cpu won war", True, "Black", "White")
+                cpu_cards.extend(war_list)
+            elif result == 2:
+                card_matchup = large_font.render("Player won war", True, "Black", "White")
+                player_cards.extend(war_list)
+            war_list.clear()
+            war_check = 0
+        #Otherwise just continue adding cards to the war_list with each click
+        else:
+            war_check -= 1
+
+    #Compare the final cards at the end of the war and append the cards to the winner
+    if war_check == 1:
+        result = compare_cards(str(war_list[-2].value), str(war_list[-1].value))
+        if result == 1:
+            card_matchup = large_font.render("Cpu won war", True, "Black", "White")
+            cpu_cards.extend(war_list)
+            war_list.clear()
+            war_check -= 1
+        elif result == 2:
+            card_matchup = large_font.render("Player won war", True, "Black", "White")
+            player_cards.extend(war_list)
+            war_list.clear()
+            war_check -= 1
+                            #Special case, if the last cards placed at the end of the war have the same value, continue war from there
+        else: 
+            card_matchup = large_font.render("War", True, "Black", "White")
+            war_check = get_value_of_card(player_cards[0].value)
+    
+    return card_matchup,card_one,card_two,war_check
+
+
+def save_and_reset(shuffle_deck, split_deck, clock, deck, player_cards, cpu_cards, cpu_score_value, player_score_value, f):
+    if len(player_cards) == 0:
+        cpu_score_value += 1
+    else: 
+        player_score_value += 1
+    player_cards.clear()
+    cpu_cards.clear()
+    shuffle_deck(deck, clock)
+    split_deck(deck, player_cards, cpu_cards)
+    f.seek(0)
+    f.truncate(0)
+    f.write(str(cpu_score_value))
+    f.write('\n')
+    f.write(str(player_score_value))
+    return cpu_score_value, player_score_value, player_cards, cpu_cards, deck
+
+
 if __name__ == "__main__":
     clock = pygame.time.Clock()
     deck = list()
@@ -63,6 +141,8 @@ if __name__ == "__main__":
     war_list = []
     war_check = 0
     done = False
+    color = "White"
+    autoplay = False
     # for card in player_cards:
     #     print("Player deck:", card.value, card.suit)
     # for card in cpu_cards:
@@ -83,33 +163,36 @@ if __name__ == "__main__":
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
     screen.fill(GRAY)
-
+    pygame.display.set_caption('War')
     large_font = pygame.font.Font(None, 50)
 
-    deal_button = large_font.render("DEAL", True, (0,0,0), (255,255,255))
+    deal_button = large_font.render("Place Cards", True, "Black", "GRAY")
     deal_button_rect = deal_button.get_rect()
     deal_button_rect.center = (WIDTH/2, HEIGHT/2)
 
-    cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, (0,0,0), (255,255,255))
+    cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, "Black", "White")
     cpu_score_rect = cpu_score.get_rect()
     cpu_score_rect.center = (WIDTH/4, HEIGHT/10)
 
-    player_score = large_font.render("Player Score: " + str(player_score_value), True, (0,0,0), (255,255,255))
+    player_score = large_font.render("Player Score: " + str(player_score_value), True, "Black", "White")
     player_score_rect = player_score.get_rect()
     player_score_rect.center = (WIDTH - WIDTH/4, HEIGHT/10)
 
-    card_matchup = large_font.render("", True, (0,0,0), (255,255,255))
+    card_matchup = large_font.render("", True, "Black", "White")
     card_matchup_rect = card_matchup.get_rect()
     card_matchup_rect.center = (WIDTH/2 - 100, HEIGHT/10)
 
-    cpu_count = large_font.render("Cards left: " + str(cpu_size), True, (0,0,0), (255,255,255))
+    cpu_count = large_font.render("Cards left: " + str(cpu_size), True, "Black", "White")
     cpu_count_rect = cpu_count.get_rect()
     cpu_count_rect.center = (WIDTH/4, HEIGHT - HEIGHT/10)
 
-    player_count = large_font.render("Cards left: " + str(player_size), True, (0,0,0), (255,255,255))
+    player_count = large_font.render("Cards left: " + str(player_size), True, "Black", "White")
     player_count_rect = player_count.get_rect()
     player_count_rect.center = (WIDTH - WIDTH/4, HEIGHT - HEIGHT/10)
 
+    autoplay_button = large_font.render("Autoplay", True, "Black", "GRAY")
+    autoplay_button_rect = autoplay_button.get_rect()
+    autoplay_button_rect.center = (WIDTH/2, HEIGHT/2 + 100)
 
     card_one = pygame.image.load(r'./cards/back.png')
     card_one = pygame.transform.scale(card_one,(500,726))
@@ -117,90 +200,50 @@ if __name__ == "__main__":
     card_two = pygame.image.load(r'./cards/back.png')
     card_two = pygame.transform.scale(card_one,(500,726))
 
+    f = open("scores.txt", "r+")
+    cpu_score_value = int(f.readline())
+    player_score_value = int(f.readline())
     while True:
         mouse = pygame.mouse.get_pos()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                f.close()
                 pygame.quit()
                 quit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                     screen.fill(GRAY)
-                    player_score = large_font.render("Player Score: " + str(player_score_value), True, (0,0,0), (255,255,255))
-                    cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, (0,0,0), (255,255,255))
-
+                    if autoplay_button_rect.collidepoint(pygame.mouse.get_pos()):
+                        autoplay = True
                     if deal_button_rect.collidepoint(pygame.mouse.get_pos()):
-                        #Place the cards down
+                        autoplay = False
+                    player_score = large_font.render("Player Score: " + str(player_score_value), True, "Black", "White")
+                    cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, "Black", "White")
+                    cpu_count = large_font.render("Cards left: " + str(len(cpu_cards)), True, "Black", "White")
+                    player_count = large_font.render("Cards left: " + str(len(player_cards)), True, "Black", "White")
 
-                        war_list.extend([cpu_cards.pop(0), player_cards.pop(0)])
-                        card_one = pygame.image.load(r'./cards/' + str(war_list[len(war_list)-2].value) + '_of_' + str(war_list[len(war_list)-2].suit) + '.png')
-                        card_two = pygame.image.load(r'./cards/' + str(war_list[len(war_list)-1].value) + '_of_' + str(war_list[len(war_list)-1].suit) + '.png')
+                    current_time = pygame.time.get_ticks()
 
-                        if war_check == 0:
-                            result = compare_cards(str(war_list[0].value), str(war_list[1].value))
-                            if result is 1:
-                                card_matchup = large_font.render("Cpu won", True, (0,0,0), (255,255,255))
-                                cpu_cards.extend(war_list)
-                                war_list.clear()
-                            elif result is 2:
-                                card_matchup = large_font.render("Player won", True, (0,0,0), (255,255,255))
-                                player_cards.extend(war_list)
-                                war_list.clear()
-                            else:
-                                card_matchup = large_font.render("War", True, (0,0,0), (255,255,255))
-                                war_check = get_value_of_card(war_list[0].value) + 2
-
-                        #If the war is ongoing, continue here
-                        if war_check > 1:
-                            card_matchup = large_font.render("War ongoing", True, (0,0,0), (255,255,255)) 
-
-                            #If someone has placed his final card before ending the war, end the war early
-                            if len(player_cards) == 0 or len(cpu_cards) == 0:
-                                result = compare_cards(str(war_list[-2].value), str(war_list[-1].value))
-                                if result == 1:
-                                    card_matchup = large_font.render("Cpu won war", True, (0,0,0), (255,255,255))
-                                    cpu_cards.extend(war_list)
-                                elif result == 2:
-                                    card_matchup = large_font.render("Player won war", True, (0,0,0), (255,255,255))
-                                    player_cards.extend(war_list)
-                                war_list.clear()
-                                war_check = 0
-                            #Otherwise just continue adding cards to the war_list with each click
-                            else:
-                                war_check -= 1
-
-                        #Compare the final cards at the end of the war and append the cards to the winner
-                        if war_check == 1:
-                            result = compare_cards(str(war_list[-2].value), str(war_list[-1].value))
-                            if result == 1:
-                                card_matchup = large_font.render("Cpu won war", True, (0,0,0), (255,255,255))
-                                cpu_cards.extend(war_list)
-                                war_list.clear()
-                                war_check -= 1
-                            elif result == 2:
-                                card_matchup = large_font.render("Player won war", True, (0,0,0), (255,255,255))
-                                player_cards.extend(war_list)
-                                war_list.clear()
-                                war_check -= 1
-                            #Special case, if the last cards placed at the end of the war have the same value, continue war from there
-                            else: 
-                                card_matchup = large_font.render("War", True, (0,0,0), (255,255,255))
-                                war_check = get_value_of_card(player_cards[0].value)
-
-
-                    cpu_count = large_font.render("Cards left: " + str(len(cpu_cards)), True, (0,0,0), (255,255,255))
-                    player_count = large_font.render("Cards left: " + str(len(player_cards)), True, (0,0,0), (255,255,255))
+                    print(current_time)
+                    if autoplay is False:
+                        card_matchup, card_one, card_two, war_check = game_logic(get_value_of_card, compare_cards, player_cards, cpu_cards, war_list, war_check, large_font)      
 
                     #If someone is left with no cards, increase the other party's score, reshuffle and split deck
                     if len(player_cards) == 0 or len(cpu_cards) == 0:
-                        if len(player_cards) == 0:
-                            cpu_score_value += 1
-                        else: 
-                            player_score_value += 1
-                        player_cards.clear()
-                        cpu_cards.clear()
-                        shuffle_deck(deck, clock)
-                        split_deck(deck, player_cards, cpu_cards)
+                            cpu_score_value, player_score_value, player_cards, cpu_cards, deck = save_and_reset(shuffle_deck, split_deck, clock, deck, player_cards, cpu_cards, cpu_score_value, player_score_value, f)
+        if autoplay is True:
+            screen.fill(GRAY)
+            player_score = large_font.render("Player Score: " + str(player_score_value), True, "Black", "White")
+            cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, "Black", "White")
+            cpu_count = large_font.render("Cards left: " + str(len(cpu_cards)), True, "Black", "White")
+            player_count = large_font.render("Cards left: " + str(len(player_cards)), True, "Black", "White")
+            now = pygame.time.get_ticks()
+            if now - current_time > 100:
+                card_matchup, card_one, card_two, war_check = game_logic(get_value_of_card, compare_cards, player_cards, cpu_cards, war_list, war_check, large_font)
+                current_time = now
+                if len(player_cards) == 0 or len(cpu_cards) == 0:
+                    cpu_score_value, player_score_value, player_cards, cpu_cards, deck = save_and_reset(shuffle_deck, split_deck, clock, deck, player_cards, cpu_cards, cpu_score_value, player_score_value, f)     
 
+        
         screen.blit(card_one, (MARGIN_LEFT,MARGIN_TOP))
         screen.blit(card_two, (MARGIN_LEFT + 950,MARGIN_TOP))
         screen.blit(deal_button, deal_button_rect)
@@ -209,7 +252,8 @@ if __name__ == "__main__":
         screen.blit(card_matchup, card_matchup_rect)
         screen.blit(player_count, player_count_rect)
         screen.blit(cpu_count, cpu_count_rect)
+        screen.blit(autoplay_button, autoplay_button_rect)
         pygame.display.update()
 
-        clock.tick(30)
+        clock.tick(300)
 
