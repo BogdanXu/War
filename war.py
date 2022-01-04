@@ -107,7 +107,7 @@ def game_logic(get_value_of_card, compare_cards, player_cards, cpu_cards, war_li
         else: 
             card_matchup = large_font.render("War", True, "Black", "White")
             war_check = get_value_of_card(player_cards[0].value)
-    
+    print("Finished a comparison")
     return card_matchup,card_one,card_two,war_check
 
 
@@ -143,6 +143,7 @@ if __name__ == "__main__":
     done = False
     color = "White"
     autoplay = False
+    lock_cards = False
     # for card in player_cards:
     #     print("Player deck:", card.value, card.suit)
     # for card in cpu_cards:
@@ -190,6 +191,10 @@ if __name__ == "__main__":
     player_count_rect = player_count.get_rect()
     player_count_rect.center = (WIDTH - WIDTH/4, HEIGHT - HEIGHT/10)
 
+    continue_message = large_font.render("Continue?", True, "Black", "White")
+    continue_message_rect = continue_message.get_rect()
+    continue_message_rect.center = (WIDTH/2, HEIGHT/2 + 200)
+
     autoplay_button = large_font.render("Autoplay", True, "Black", "GRAY")
     autoplay_button_rect = autoplay_button.get_rect()
     autoplay_button_rect.center = (WIDTH/2, HEIGHT/2 + 100)
@@ -212,47 +217,65 @@ if __name__ == "__main__":
                 quit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                     screen.fill(GRAY)
-                    if autoplay_button_rect.collidepoint(pygame.mouse.get_pos()):
-                        autoplay = True
-                    if deal_button_rect.collidepoint(pygame.mouse.get_pos()):
-                        autoplay = False
+
                     player_score = large_font.render("Player Score: " + str(player_score_value), True, "Black", "White")
                     cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, "Black", "White")
                     cpu_count = large_font.render("Cards left: " + str(len(cpu_cards)), True, "Black", "White")
                     player_count = large_font.render("Cards left: " + str(len(player_cards)), True, "Black", "White")
 
+
+                    if autoplay_button_rect.collidepoint(pygame.mouse.get_pos()) and lock_cards is False:
+                        autoplay = True
+                    if deal_button_rect.collidepoint(pygame.mouse.get_pos()) and lock_cards is False:
+                        card_matchup, card_one, card_two, war_check = game_logic(get_value_of_card, compare_cards, player_cards, cpu_cards, war_list, war_check, large_font)
+                        autoplay = False
+                    if continue_message_rect.collidepoint(pygame.mouse.get_pos()):
+                        lock_cards = False
+
                     current_time = pygame.time.get_ticks()
 
                     print(current_time)
-                    if autoplay is False:
-                        card_matchup, card_one, card_two, war_check = game_logic(get_value_of_card, compare_cards, player_cards, cpu_cards, war_list, war_check, large_font)      
 
-                    #If someone is left with no cards, increase the other party's score, reshuffle and split deck
-                    if len(player_cards) == 0 or len(cpu_cards) == 0:
-                            cpu_score_value, player_score_value, player_cards, cpu_cards, deck = save_and_reset(shuffle_deck, split_deck, clock, deck, player_cards, cpu_cards, cpu_score_value, player_score_value, f)
+    
+
+                    
         if autoplay is True:
             screen.fill(GRAY)
+
             player_score = large_font.render("Player Score: " + str(player_score_value), True, "Black", "White")
             cpu_score = large_font.render("Cpu Score: " + str(cpu_score_value), True, "Black", "White")
             cpu_count = large_font.render("Cards left: " + str(len(cpu_cards)), True, "Black", "White")
             player_count = large_font.render("Cards left: " + str(len(player_cards)), True, "Black", "White")
+
             now = pygame.time.get_ticks()
-            if now - current_time > 100:
+            if now - current_time > 30:
                 card_matchup, card_one, card_two, war_check = game_logic(get_value_of_card, compare_cards, player_cards, cpu_cards, war_list, war_check, large_font)
                 current_time = now
-                if len(player_cards) == 0 or len(cpu_cards) == 0:
-                    cpu_score_value, player_score_value, player_cards, cpu_cards, deck = save_and_reset(shuffle_deck, split_deck, clock, deck, player_cards, cpu_cards, cpu_score_value, player_score_value, f)     
+    
+        #If someone is left with no cards, increase the other party's score, reshuffle and split deck
+        if len(player_cards) == 0 or len(cpu_cards) == 0:
+                autoplay = False
+                lock_cards = True
+                card_matchup = large_font.render("Match finished", True, "Black", "White")
+                cpu_score_value, player_score_value, player_cards, cpu_cards, deck = save_and_reset(shuffle_deck, split_deck, clock, deck, player_cards, cpu_cards, cpu_score_value, player_score_value, f)
 
-        
+
+
         screen.blit(card_one, (MARGIN_LEFT,MARGIN_TOP))
         screen.blit(card_two, (MARGIN_LEFT + 950,MARGIN_TOP))
-        screen.blit(deal_button, deal_button_rect)
         screen.blit(cpu_score, cpu_score_rect)
         screen.blit(player_score, player_score_rect)
         screen.blit(card_matchup, card_matchup_rect)
-        screen.blit(player_count, player_count_rect)
-        screen.blit(cpu_count, cpu_count_rect)
-        screen.blit(autoplay_button, autoplay_button_rect)
+        
+        if lock_cards is True:
+            screen.blit(continue_message, continue_message_rect)
+
+        if lock_cards is False:
+            screen.blit(player_count, player_count_rect)
+            screen.blit(cpu_count, cpu_count_rect)
+            screen.blit(autoplay_button, autoplay_button_rect)
+            screen.blit(deal_button, deal_button_rect)
+
         pygame.display.update()
 
         clock.tick(300)
